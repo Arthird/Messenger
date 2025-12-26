@@ -1,0 +1,8 @@
+{
+  "name": "messenger",
+  "version": "0.0.1",
+  "scripts": {
+    "backend": "cd messenger-backend && npm run dev",
+    "frontend": "cd messenger-frontend && npm run dev"
+  }
+}
