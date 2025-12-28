@@ -2,7 +2,7 @@
   "name": "messenger",
   "version": "0.0.1",
   "scripts": {
-    "backend": "cd messenger-backend && npm run dev",
-    "frontend": "cd messenger-frontend && npm run dev"
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev"
   }
 }

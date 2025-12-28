@@ -2,14 +2,14 @@
   "name": "messenger-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "server.mjs",
   "scripts": {
-    "dev": "node ./server.js"
+    "dev": "node server.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "ws": "8.18.3"
   }
