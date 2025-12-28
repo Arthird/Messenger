@@ -1,8 +1,8 @@
 const WebSocket = require("ws");
 const wss = new WebSocket.Server({ port: 8080 });
 
-// Структура: rooms = { 'roomCode': Set<WebSocket> }
-const rooms = new Map();
+// Структура: rooms = { 'meetingCode': Set<WebSocket> }
+const meetings = new Map();
 
 console.log("Сигналинг-сервер запущен на ws://localhost:8080");
 
@@ -10,40 +10,44 @@ wss.on("connection", (ws) => {
   console.log("Новое соединение");
 
   // Храним текущую комнату этого сокета (опционально)
-  ws.roomCode = null;
+  ws.meetingCode = null;
 
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data);
 
       // Обязательно: клиент должен сначала "войти" в комнату
-      if (msg.type === "join") {
-        const roomCode = msg.roomCode;
-        if (!roomCode || typeof roomCode !== "string") {
-          ws.send(JSON.stringify({ error: "Неверный код комнаты" }));
-          return;
-        }
+      switch (msg.type) {
+        case "join":
+          const meetingCode = msg.meetingCode;
 
-        // Выйти из предыдущей комнаты (если был)
-        if (ws.roomCode) {
-          leaveRoom(ws, ws.roomCode);
-        }
+          // Выйти из предыдущей комнаты (если был)
+          if (ws.meetingCode) {
+            leave(ws, ws.meetingCode);
+          }
 
-        // Войти в новую комнату
-        joinRoom(ws, roomCode);
-        ws.roomCode = roomCode;
-        console.log(`Клиент вошёл в комнату: ${roomCode}`);
-        return;
+          // Войти в новую комнату
+          join(ws, meetingCode);
+          ws.meetingCode = meetingCode;
+          console.log(`Клиент вошёл в комнату: ${meetingCode}`);
+          break;
+        
+        case 'offer':
+          break;
+        case 'answer':
+          break;
+        case 'ice-candidate':
+          break;
       }
 
       // Если клиент ещё не в комнате — игнорируем другие сообщения
-      if (!ws.roomCode) {
+      if (!ws.meetingCode) {
         ws.send(JSON.stringify({ error: "Сначала присоединитесь к комнате" }));
         return;
       }
 
       // Ретранслируем сообщение всем в комнате (кроме отправителя)
-      broadcastToRoom(ws.roomCode, data, ws);
+      broadcast(ws.meetingCode, data, ws);
     } catch (err) {
       console.error("Ошибка обработки сообщения:", err);
       ws.send(JSON.stringify({ error: "Некорректное сообщение" }));
@@ -51,8 +55,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    if (ws.roomCode) {
-      leaveRoom(ws, ws.roomCode);
+    if (ws.meetingCode) {
+      leave(ws, ws.meetingCode);
     }
     console.log("Соединение закрыто");
   });
@@ -62,30 +66,30 @@ wss.on("connection", (ws) => {
   });
 });
 
-function joinRoom(ws, roomCode) {
-  if (!rooms.has(roomCode)) {
-    rooms.set(roomCode, new Set());
+function join(ws, meetingCode) {
+  if (!meetings.has(meetingCode)) {
+    meetings.set(meetingCode, new Set());
   }
-  rooms.get(roomCode).add(ws);
+  meetings.get(meetingCode).add(ws);
+  console.log(meetings.get(meetingCode))
 }
 
-function leaveRoom(ws, roomCode) {
-  const room = rooms.get(roomCode);
-  if (room) {
-    room.delete(ws);
-    // Очистка пустых комнат (опционально)
-    if (room.size === 0) {
-      rooms.delete(roomCode);
-      console.log(`Комната ${roomCode} удалена (пустая)`);
+function leave(ws, meetingCode) {
+  const meeting = meetings.get(meetingCode);
+  if (meeting) {
+    meeting.delete(ws);
+    if (meeting.size === 0) {
+      meetings.delete(meetingCode);
+      console.log(`Комната ${meetingCode} удалена (пустая)`);
     }
   }
 }
 
-function broadcastToRoom(roomCode, data, sender) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
+function broadcast(meetingCode, data, sender) {
+  const meeting = meetings.get(meetingCode);
+  if (!meeting) return;
 
-  room.forEach((client) => {
+  meeting.forEach((client) => {
     if (client !== sender && client.readyState === WebSocket.OPEN) {
       client.send(data);
     }

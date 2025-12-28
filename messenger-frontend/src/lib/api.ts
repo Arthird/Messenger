@@ -22,6 +22,10 @@ socket.onerror = function (error) {
   console.log(`[error]: ${error}`);
 };
 
-export function send(msg: Message) {
-  socket.send(JSON.stringify(msg))
-}
+const api = {
+  send(msg: Message) {
+    socket.send(JSON.stringify(msg));
+  },
+};
+
+export default api;
