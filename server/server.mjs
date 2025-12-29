@@ -1,8 +1,12 @@
-import logger from "./src/logger";
-import WebSocket from "ws";
-const server = new WebSocket.Server({ port: 8080 });
+import UsersCollection from "./src/models/UsersCollection.js";
+import MeetingsCollection from "./src/models/MeetingsCollection.js";
+import logger from "./src/utils/logger.js";
+import { WebSocketServer } from "ws";
 
-const meetings = new Map();
+const server = new WebSocketServer({ port: 8080 });
+
+const meetings = new MeetingsCollection();
+const users = new UsersCollection();
 
 server.on("listening", () => {
   logger.log("Launch complite");
@@ -10,94 +14,79 @@ server.on("listening", () => {
 
 server.on("connection", (senderSocket) => {
   logger.log("A new client has connect");
+  // -- const user = new User(senderSocket)
+  users.append(senderSocket); // -- статическое св-во должно быть с количеством юзеров
 
-  senderSocket.meetingCode = null;
+  senderSocket.meetingCode = null; //user.meetingCode = null в самом классе
 
   senderSocket.on("message", (message) => {
+    // -- user.socket .on("message", (message) => {
+    // logger.log(message);
+    const data = JSON.parse(message);
+
     try {
-      const data = JSON.parse(message);
-
-      switch (data.type) {
-        case "join":
-          joinMeeting(senderSocket, data.meetingCode);
-          broadcast(senderSocket, senderSocket.meetingCode, data);
-          break;
-
-        case "offer":
-          broadcast(senderSocket, senderSocket.meetingCode, data);
-          break;
-        case "answer":
-          break;
-        case "ice-candidate":
-          break;
-      }
-
-      // Если клиент ещё не в комнате — игнорируем другие сообщения
-      if (!senderSocket.meetingCode) {
+      if (!senderSocket.meetingCode && data.type !== "join") {
+        // -- if (!user.hasMeeting && data.type !== "join") {
         senderSocket.send(
+          // -- user.send(
           JSON.stringify({ type: "error", errorCode: "NO_MEETING" }),
         );
+
+        logger.error("Attempting to connect outside of a meeting");
         return;
       }
     } catch (err) {
-      logger.error("Ошибка обработки сообщения:", err);
-      senderSocket.send(JSON.stringify({ type: "error", errorCode: err.name }));
+      logger.error(JSON.stringify(err));
+    }
+
+    switch (data.type) {
+      case "join":
+        meetings.joinMeeting(senderSocket, data.meetingCode);
+        meetings.broadcastToMeeting(
+          senderSocket,
+          senderSocket.meetingCode,
+          data,
+        );
+        /*
+        user.joinMeeting(data.meetingCode);
+        user.broadcastToMeeting(
+          data
+        );
+        */
+        break;
+
+      case "offer":
+        meetings.broadcastToMeeting(
+          senderSocket,
+          senderSocket.meetingCode,
+          data,
+        );
+        /*
+        user.broadcastToMeeting(
+          data
+        );
+        */
+        break;
+      case "answer":
+        break;
+      case "ice-candidate":
+        break;
     }
   });
 
   senderSocket.on("close", () => {
-    leaveMeeting(senderSocket);
+    meetings.leaveMeeting(senderSocket);
+    users.remove(senderSocket);
     logger.log("Соединение закрыто");
   });
-
+  /*
+  user.socket.on("close", () => {
+    user.leaveMeeting(senderSocket);
+    logger.log("Соединение закрыто");
+  });
+  */
   senderSocket.on("error", (err) => {
+    // -- user.socket.on("error", (err) => {
     logger.error("WebSocket error:", err);
   });
 });
-
-function leaveMeeting(senderSocket) {
-  if (senderSocket.meetingCode && meetings.has(senderSocket.meetingCode)) {
-    const meetingCode = senderSocket.meetingCode;
-    const meeting = meetings.get(meetingCode);
-
-    logger.log(
-      `Из встречи ${meetingCode} вышел 1 участник, осталось участников: ${meeting.size()}`,
-    );
-
-    if (meeting.size === 0) {
-      meetings.delete(meetingCode);
-      logger.log(`Комната ${meetingCode} удалена`);
-    }
-  }
-}
-
-function joinMeeting(senderSocket, meetingCode) {
-  if (senderSocket.meetingCode) {
-    leaveMeeting(senderSocket, senderSocket.meetingCode);
-  }
-
-  if (!meetings.has(meetingCode)) {
-    meetings.set(meetingCode, new Set());
-  }
-
-  meetings.get(meetingCode).add(senderSocket);
-  senderSocket.meetingCode = meetingCode;
-
-  logger.log(
-    `Клиент вошёл в комнату: ${meetingCode}, количество участников во встрече: ${meetings.get(meetingCode).size()}`,
-  );
-}
-
-function broadcast(senderSocket, meetingCode, data) {
-  const meeting = meetings.get(meetingCode);
-  if (!meeting) return;
-
-  meeting.forEach((clientSocket) => {
-    if (
-      clientSocket !== senderSocket &&
-      clientSocket.readyState === WebSocket.OPEN
-    ) {
-      clientSocket.send(data);
-    }
-  });
-}

@@ -1,4 +1,4 @@
-import Message from "@/models/message";
+import Message from "@/models/Message";
 
 const socket = new WebSocket("ws://localhost:8080");
 
@@ -12,8 +12,6 @@ socket.onclose = function (event) {
       `[close] Соединение закрыто чисто, код=${event.code} причина=${event.reason}`,
     );
   } else {
-    // например, сервер убил процесс или сеть недоступна
-    // обычно в этом случае event.code 1006
     console.log("[close] Соединение прервано");
   }
 };
