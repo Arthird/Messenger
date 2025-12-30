@@ -48,8 +48,8 @@ export default function Home() {
     setHasWarning(false);
   };
 
-  return (
-    <main className="flex items-center justify-center w-full h-dvh max-h-dvh">
+  return ( 
+    <main className="flex items-center justify-center h-dvh max-h-dvh">
       <div className="flex flex-col items-center min-h-80 h-80">
         <h1 className="text-8xl">Hush!</h1>
         <input
